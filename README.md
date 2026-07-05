@@ -1,5 +1,8 @@
 # 🩺 AI Capstone — Medical Embedding Fine-Tuning (MedEmbed-style)
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Om-merkle/AI_CAP_MED_EMBED/blob/main/notebooks/run_on_colab.ipynb)
+[![Open In Kaggle](https://kaggle.com/static/images/open-in-kaggle.svg)](https://kaggle.com/kernels/welcome?src=https://github.com/Om-merkle/AI_CAP_MED_EMBED/blob/main/notebooks/run_on_kaggle.ipynb)
+
 An end-to-end application that fine-tunes a text-embedding model on **medical data** and
 proves it got better on the medical domain. It reproduces the MedEmbed recipe with a simple,
 understandable pipeline:
