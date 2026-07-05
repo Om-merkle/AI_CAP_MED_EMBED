@@ -15,7 +15,7 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException
 
 from core import (
     baseline, benchmark, compare, data_prep, evaluate, jobs, leaderboard,
-    llm_triplet_gen, train, triplet_mining,
+    llm_triplet_gen, med_leaderboard, train, triplet_mining,
 )
 from core.config import settings
 from api.schemas import ConfigUpdate, Job, JobRef
@@ -123,6 +123,20 @@ def get_compare() -> dict[str, object]:
         return compare.diff()
     except FileNotFoundError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+
+
+@app.post("/med-leaderboard", response_model=JobRef)
+def run_med_leaderboard(bg: BackgroundTasks) -> JobRef:
+    """Evaluate the benchmark models on the medical MTEB tasks (slow; cached)."""
+    return _launch("med-leaderboard", lambda: med_leaderboard.evaluate(tasks=med_leaderboard.QUICK_TASKS), bg)
+
+
+@app.get("/med-leaderboard")
+def get_med_leaderboard() -> dict[str, object]:
+    """Cached MedEmbed-style benchmark results (results/med_benchmarks.json)."""
+    if not med_leaderboard.CACHE_PATH.exists():
+        raise HTTPException(status_code=404, detail="no medical benchmark results yet")
+    return json.loads(med_leaderboard.CACHE_PATH.read_text(encoding="utf-8"))
 
 
 @app.get("/llm-usage")

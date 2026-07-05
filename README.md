@@ -139,6 +139,28 @@ Streamlit UI. Prices are configurable in `.env`
 fine-tuned **IR nDCG@10** (and the official **medical MTEB nDCG@10**) is measurably higher
 than the baseline — the same before/after story MedEmbed tells versus vanilla BGE.
 
+## Medical benchmark leaderboard (MedEmbed-style)
+
+The same "Medical / Clinical related Retrieval Benchmarks" table the MedEmbed project
+publishes: every model evaluated on the official medical MTEB tasks (TRECCOVID,
+MedicalQARetrieval, PublicHealthQA, NFCorpus, ArguAna), reporting **nDCG@10 + MRR@5 per
+task** and **# params**, with the best score per column in bold and your fine-tuned models
+highlighted. Both notebooks include a ready-made cell; standalone:
+
+```bash
+python -m core.med_leaderboard --quick        # skips TRECCOVID (the slow one)
+python -m core.med_leaderboard --models BAAI/bge-small-en-v1.5,abhinand/MedEmbed-small-v0.1
+```
+
+```python
+from core import med_leaderboard
+med_leaderboard.evaluate(models=[...])   # cached per (model, task) in results/med_benchmarks.json
+med_leaderboard.styled()                 # rich table in a notebook
+```
+
+Also in the Streamlit UI ("Medical benchmark leaderboard") and via the API
+(`POST /med-leaderboard` to compute, `GET /med-leaderboard` for the cached results).
+
 ## Per-run leaderboard
 
 Every run appends its metrics to `results/leaderboard.csv` and prints a ranked table

@@ -172,3 +172,23 @@ if st.button("Show leaderboard"):
         st.info("Leaderboard is empty — finish a pipeline run first.")
     else:
         st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
+st.subheader("🩺 Medical benchmark leaderboard (MedEmbed-style)")
+st.caption("nDCG@10 + MRR@5 per medical MTEB task; best per column in bold, "
+           "your fine-tuned models highlighted. Slow to compute — results are cached.")
+mc1, mc2 = st.columns(2)
+with mc1:
+    if st.button("Run medical benchmarks (slow)"):
+        run_job("/med-leaderboard", "Medical benchmarks")
+with mc2:
+    if st.button("Show medical benchmark table"):
+        resp = requests.get(f"{API_URL}/med-leaderboard", timeout=30)
+        if resp.status_code != 200:
+            st.info("No medical benchmark results yet — run them first (or on Colab/Kaggle).")
+        else:
+            from core import med_leaderboard
+            styler = med_leaderboard.styled()
+            if hasattr(styler, "to_html"):
+                st.markdown(styler.to_html(), unsafe_allow_html=True)
+            else:
+                st.dataframe(styler, use_container_width=True)
