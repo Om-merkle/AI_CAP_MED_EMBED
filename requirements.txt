@@ -1,0 +1,23 @@
+# ---- Core ML / embedding fine-tuning ----
+sentence-transformers>=3.3.0     # SentenceTransformerTrainer + util.mine_hard_negatives
+mteb>=1.12.0                     # official medical MTEB tasks (NFCorpus, MedicalQARetrieval)
+datasets>=2.19.0                 # load medical datasets from the HF Hub
+accelerate>=0.30.0               # required by the HF Trainer backend
+huggingface_hub>=0.23.0          # optional: push the fine-tuned model to the Hub
+
+# NOTE: `torch` is intentionally NOT pinned here.
+#  - Kaggle / Colab already ship a CUDA-enabled torch (pinning would downgrade to CPU).
+#  - Locally it is pulled in automatically as a dependency of sentence-transformers.
+
+# ---- App (backend + frontend) ----
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+streamlit>=1.34.0
+requests>=2.31.0
+pandas>=2.0.0
+numpy>=1.26.0
+
+# ---- Config + optional LLM triplet generation ----
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.0
+openai>=1.30.0                   # only used by the OPTIONAL clinical triplet generator
