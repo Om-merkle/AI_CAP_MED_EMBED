@@ -37,7 +37,10 @@ def parse_args() -> argparse.Namespace:
                    help="limit number of training pairs (default: all)")
     p.add_argument("--eval-queries", type=int, default=settings.eval_queries)
     p.add_argument("--num-negatives", type=int, default=settings.num_negatives)
-    p.add_argument("--no-mteb", action="store_true", help="skip the official MTEB task (faster)")
+    p.add_argument("--no-mteb", action="store_true", help="skip the official MTEB tasks (faster)")
+    p.add_argument("--mteb-tasks", default="",
+                   help="comma-separated MTEB benchmark suite, or 'all' to add TRECCOVID "
+                        "(default: MedicalQARetrieval,PublicHealthQA,NFCorpus,ArguAna)")
     p.add_argument("--llm-triplets", action="store_true",
                    help="use LLM-generated clinical triplets instead of hard-negative mining")
     p.add_argument("--benchmark", action="store_true",
@@ -56,6 +59,7 @@ def apply_args(args: argparse.Namespace) -> None:
     settings.eval_queries = args.eval_queries
     settings.num_negatives = args.num_negatives
     settings.run_mteb = not args.no_mteb
+    settings.mteb_tasks = args.mteb_tasks
 
 
 def main() -> None:
@@ -69,7 +73,9 @@ def main() -> None:
     )
 
     print(f"[device] {settings.device}  |  base_model={settings.base_model}  "
-          f"domain={settings.domain}  mteb_task={settings.effective_mteb_task}")
+          f"domain={settings.domain}  primary_task={settings.effective_mteb_task}")
+    if settings.run_mteb:
+        print(f"[benchmarks] {', '.join(settings.effective_mteb_tasks)}")
 
     print("\n[1/6] Preparing medical data ...")
     print(json.dumps(data_prep.build_pairs(), indent=2))

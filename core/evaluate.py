@@ -67,44 +67,64 @@ def ir_evaluate(model: SentenceTransformer) -> dict[str, Any]:
     }
 
 
-def _extract_mteb_ndcg(results: Any) -> float | None:
-    """Pull ndcg_at_10 out of an MTEB result across library versions."""
+_PREFERRED_SUBSETS = ("default", "eng", "en", "eng-eng")
+
+
+def _extract_mteb_metrics(results: Any) -> dict[str, float | None]:
+    """Pull ndcg_at_10 + mrr_at_5 (0-1 scale) out of an MTEB result, preferring English."""
     r = results[0] if isinstance(results, (list, tuple)) and results else results
-    if hasattr(r, "get_score"):
-        try:
-            return round(float(r.get_score()), 4)
-        except Exception:
-            pass
     scores = getattr(r, "scores", None)
     if scores is None and isinstance(r, dict):
         scores = r.get("scores", r)
+
+    entries: list[dict[str, Any]] = []
     try:
         for split_entries in scores.values():
-            entries = split_entries if isinstance(split_entries, list) else [split_entries]
-            for entry in entries:
-                if isinstance(entry, dict) and "ndcg_at_10" in entry:
-                    return round(float(entry["ndcg_at_10"]), 4)
+            entries.extend(split_entries if isinstance(split_entries, list) else [split_entries])
     except Exception:
-        pass
-    return None
+        return {"ndcg@10": None, "mrr@5": None}
+
+    def rank(entry: dict[str, Any]) -> int:
+        subset = str(entry.get("hf_subset", "default"))
+        return _PREFERRED_SUBSETS.index(subset) if subset in _PREFERRED_SUBSETS else len(_PREFERRED_SUBSETS)
+
+    for entry in sorted((e for e in entries if isinstance(e, dict)), key=rank):
+        if "ndcg_at_10" in entry:
+            return {
+                "ndcg@10": round(float(entry["ndcg_at_10"]), 4),
+                "mrr@5": round(float(entry["mrr_at_5"]), 4) if "mrr_at_5" in entry else None,
+            }
+    return {"ndcg@10": None, "mrr@5": None}
 
 
 def mteb_evaluate(model: SentenceTransformer) -> dict[str, Any]:
-    """Run the official MTEB medical task. Returns {'ndcg@10': ...} or an 'error'."""
-    task_name = settings.effective_mteb_task
-    try:
-        import mteb
+    """Run the medical MTEB benchmark suite (settings.effective_mteb_tasks).
 
-        tasks = mteb.get_tasks(tasks=[task_name])
-        results = mteb.MTEB(tasks=tasks).run(
-            model,
-            output_folder=str(settings.mteb_dir),
-            verbosity=0,
-            overwrite_results=True,
-        )
-        return {"task": task_name, "ndcg@10": _extract_mteb_ndcg(results)}
-    except Exception as exc:  # never let the optional benchmark break the pipeline
-        return {"task": task_name, "ndcg@10": None, "error": str(exc)}
+    Returns {'task': <primary>, 'ndcg@10': <primary score>, 'tasks': {name: metrics}}.
+    The top-level task/ndcg@10 keep the primary-benchmark contract for compare/leaderboard.
+    """
+    per_task: dict[str, Any] = {}
+    for task_name in settings.effective_mteb_tasks:
+        try:
+            import mteb
+
+            tasks = mteb.get_tasks(tasks=[task_name])
+            results = mteb.MTEB(tasks=tasks).run(
+                model,
+                output_folder=str(settings.mteb_dir),
+                verbosity=0,
+                overwrite_results=True,
+            )
+            per_task[task_name] = _extract_mteb_metrics(results)
+        except Exception as exc:  # one bad task must never break the pipeline
+            per_task[task_name] = {"ndcg@10": None, "mrr@5": None, "error": str(exc)}
+
+    primary = settings.effective_mteb_task
+    return {
+        "task": primary,
+        "ndcg@10": per_task.get(primary, {}).get("ndcg@10"),
+        "tasks": per_task,
+    }
 
 
 def _triplet_accuracy(model: SentenceTransformer) -> float | None:

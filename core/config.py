@@ -16,13 +16,21 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Project root = the folder that contains this `core/` package.
 ROOT = Path(__file__).resolve().parent.parent
 
-# Each medical domain maps to its closest official MTEB retrieval task, so the
-# "real" benchmark number always matches the training domain.
+# Each medical domain maps to its closest official MTEB retrieval task — the
+# "primary" benchmark used for the headline before/after number.
 DOMAIN_MTEB_TASKS: dict[str, str] = {
     "nfcorpus": "NFCorpus",                    # medical/nutrition IR (BeIR)
     "flashcards": "MedicalQARetrieval",        # medical QA
     "medembed": "MedicalQARetrieval",          # MedEmbed clinical triplets
 }
+
+# The default medical benchmark suite: baseline AND fine-tuned models are evaluated
+# on ALL of these, so the leaderboard shows a per-benchmark comparison (same suite
+# as the MedEmbed paper minus TRECCOVID, which is ~171k docs and opt-in).
+MTEB_BENCHMARK_TASKS: list[str] = [
+    "MedicalQARetrieval", "PublicHealthQA", "NFCorpus", "ArguAna",
+]
+MTEB_ALL_TASKS: list[str] = MTEB_BENCHMARK_TASKS + ["TRECCOVID"]
 
 
 class Settings(BaseSettings):
@@ -31,7 +39,8 @@ class Settings(BaseSettings):
     # ---- Model / domain ----
     base_model: str = "BAAI/bge-small-en-v1.5"
     domain: str = "nfcorpus"                # nfcorpus | flashcards | medembed
-    mteb_task: str = ""                     # empty = auto-resolve from the domain
+    mteb_task: str = ""                     # primary task; empty = auto from the domain
+    mteb_tasks: str = ""                    # comma-separated suite; empty = MTEB_BENCHMARK_TASKS
 
     # ---- Data sizing (keep small for CPU demos, raise on Kaggle GPU) ----
     sample_size: int | None = None          # of training pairs; None = use all
@@ -83,7 +92,20 @@ class Settings(BaseSettings):
 
     @property
     def effective_mteb_task(self) -> str:
+        """The primary benchmark (headline before/after number)."""
         return self.mteb_task or DOMAIN_MTEB_TASKS.get(self.domain, "NFCorpus")
+
+    @property
+    def effective_mteb_tasks(self) -> list[str]:
+        """The full benchmark suite evaluated for baseline and fine-tuned models."""
+        if self.mteb_tasks:
+            names = [t.strip() for t in self.mteb_tasks.split(",") if t.strip()]
+            return MTEB_ALL_TASKS if names == ["all"] else names
+        suite = list(MTEB_BENCHMARK_TASKS)
+        primary = self.effective_mteb_task
+        if primary not in suite:
+            suite.insert(0, primary)
+        return suite
 
     @property
     def finetuned_model_dir(self) -> Path:

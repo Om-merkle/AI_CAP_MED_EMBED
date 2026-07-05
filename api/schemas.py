@@ -12,6 +12,7 @@ class ConfigUpdate(BaseModel):
 
     base_model: str | None = None
     domain: str | None = None
+    mteb_tasks: str | None = None
     sample_size: int | None = None
     eval_queries: int | None = None
     num_negatives: int | None = None

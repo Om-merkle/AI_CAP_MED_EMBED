@@ -41,6 +41,7 @@ def get_config() -> dict[str, object]:
         "domain": settings.domain,
         "domains": sorted(data_prep.DOMAINS),
         "mteb_task": settings.effective_mteb_task,
+        "mteb_tasks": settings.effective_mteb_tasks,
         "sample_size": settings.sample_size,
         "eval_queries": settings.eval_queries,
         "num_negatives": settings.num_negatives,

@@ -1,4 +1,4 @@
-# 🩺 AI Capstone — Medical Embedding Fine-Tuning (MedEmbed-style)
+# 🩺 AI — Medical Embedding Fine-Tuning (MedEmbed-style)
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Om-merkle/AI_CAP_MED_EMBED/blob/main/notebooks/run_on_colab.ipynb)
 [![Open In Kaggle](https://img.shields.io/badge/Open%20in-Kaggle-20BEFF?logo=kaggle&logoColor=white)](https://kaggle.com/kernels/welcome?src=https://github.com/Om-merkle/AI_CAP_MED_EMBED/blob/main/notebooks/run_on_kaggle.ipynb)
@@ -135,6 +135,22 @@ and the estimated cost per the configured model, e.g.
 persist in `results/llm_usage.json`, via `GET /llm-usage`, and as metric tiles in the
 Streamlit UI. Prices are configurable in `.env`
 (`OPENAI_INPUT_PRICE_PER_1M`, `OPENAI_OUTPUT_PRICE_PER_1M`).
+
+## Multi-benchmark evaluation (4–5 medical MTEB tasks)
+
+Every pipeline run evaluates the **base and fine-tuned models on a suite of 4 medical MTEB
+benchmarks** — MedicalQARetrieval, PublicHealthQA, NFCorpus, ArguAna — and the comparison
+plus the run leaderboard show per-benchmark before/after/delta columns. TRECCOVID (the 5th,
+~171k docs) is opt-in:
+
+```bash
+python run_pipeline.py --domain nfcorpus --mteb-tasks all        # 5 benchmarks incl. TRECCOVID
+python run_pipeline.py --mteb-tasks NFCorpus,ArguAna             # custom subset
+python run_pipeline.py --no-mteb                                 # skip benchmarks (fast demo)
+```
+
+On a T4, the 4-task suite adds roughly 20–40 min (each benchmark runs twice: baseline and
+fine-tuned). The headline metric remains the domain's primary task.
 
 ## What "success" looks like
 

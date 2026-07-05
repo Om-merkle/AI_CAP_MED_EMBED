@@ -38,17 +38,29 @@ def diff() -> dict[str, Any]:
         a = ft.get("ir", {}).get(metric)
         rows.append({"metric": f"IR {metric}", "baseline": b, "finetuned": a, "delta": _delta(b, a)})
 
-    b_mteb = base.get("mteb", {}).get("ndcg@10")
-    a_mteb = ft.get("mteb", {}).get("ndcg@10")
-    if b_mteb is not None or a_mteb is not None:
+    # One row per benchmark in the medical MTEB suite (4-5 tasks).
+    b_tasks = base.get("mteb", {}).get("tasks", {})
+    a_tasks = ft.get("mteb", {}).get("tasks", {})
+    for task in dict.fromkeys(list(b_tasks) + list(a_tasks)):
+        b = b_tasks.get(task, {}).get("ndcg@10")
+        a = a_tasks.get(task, {}).get("ndcg@10")
         rows.append(
-            {
-                "metric": f"MTEB {settings.effective_mteb_task} ndcg@10",
-                "baseline": b_mteb,
-                "finetuned": a_mteb,
-                "delta": _delta(b_mteb, a_mteb),
-            }
+            {"metric": f"MTEB {task} ndcg@10", "baseline": b, "finetuned": a, "delta": _delta(b, a)}
         )
+
+    # Back-compat: results produced before the multi-benchmark suite had a single score.
+    if not b_tasks and not a_tasks:
+        b_mteb = base.get("mteb", {}).get("ndcg@10")
+        a_mteb = ft.get("mteb", {}).get("ndcg@10")
+        if b_mteb is not None or a_mteb is not None:
+            rows.append(
+                {
+                    "metric": f"MTEB {settings.effective_mteb_task} ndcg@10",
+                    "baseline": b_mteb,
+                    "finetuned": a_mteb,
+                    "delta": _delta(b_mteb, a_mteb),
+                }
+            )
 
     headline = _delta(base.get("ir", {}).get("ndcg@10"), ft.get("ir", {}).get("ndcg@10"))
     result = {
