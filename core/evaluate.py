@@ -67,7 +67,7 @@ def ir_evaluate(model: SentenceTransformer) -> dict[str, Any]:
     }
 
 
-_PREFERRED_SUBSETS = ("default", "eng", "en", "eng-eng")
+_PREFERRED_SUBSETS = ("default", "english", "eng", "en", "eng-eng")
 
 
 def _extract_mteb_metrics(results: Any) -> dict[str, float | None]:
@@ -103,12 +103,14 @@ def mteb_evaluate(model: SentenceTransformer) -> dict[str, Any]:
     Returns {'task': <primary>, 'ndcg@10': <primary score>, 'tasks': {name: metrics}}.
     The top-level task/ndcg@10 keep the primary-benchmark contract for compare/leaderboard.
     """
+    from core.med_leaderboard import _get_english_tasks
+
     per_task: dict[str, Any] = {}
     for task_name in settings.effective_mteb_tasks:
         try:
             import mteb
 
-            tasks = mteb.get_tasks(tasks=[task_name])
+            tasks = _get_english_tasks(task_name)
             results = mteb.MTEB(tasks=tasks).run(
                 model,
                 output_folder=str(settings.mteb_dir),

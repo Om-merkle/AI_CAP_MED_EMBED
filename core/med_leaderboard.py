@@ -34,7 +34,20 @@ QUICK_TASKS = ["MedicalQARetrieval", "PublicHealthQA", "NFCorpus", "ArguAna"]
 
 CACHE_PATH = settings.results_dir / "med_benchmarks.json"
 
-_PREFERRED_SUBSETS = ("default", "eng", "en", "eng-eng")
+_PREFERRED_SUBSETS = ("default", "english", "eng", "en", "eng-eng")
+
+
+def _get_english_tasks(task_name: str):
+    """Fetch a task restricted to English (PublicHealthQA etc. are multilingual)."""
+    import mteb
+
+    try:
+        tasks = mteb.get_tasks(tasks=[task_name], languages=["eng"])
+        if tasks:
+            return tasks
+    except Exception:
+        pass
+    return mteb.get_tasks(tasks=[task_name])
 
 
 def _load_cache() -> dict[str, Any]:
@@ -102,7 +115,7 @@ def evaluate(models: list[str] | None = None, tasks: list[str] | None = None) ->
 
         for task_name in missing:
             try:
-                task_objs = mteb.get_tasks(tasks=[task_name])
+                task_objs = _get_english_tasks(task_name)
                 results = mteb.MTEB(tasks=task_objs).run(
                     model,
                     output_folder=str(settings.mteb_dir),
