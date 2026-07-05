@@ -59,8 +59,12 @@ prepare data → collect triplets → benchmark models → MTEB/IR baseline → 
 | `flashcards` | [medalpaca/medical_meadow_medical_flashcards](https://huggingface.co/datasets/medalpaca/medical_meadow_medical_flashcards) — all 33,955 medical Q/A pairs (bundled: `data/raw/medical_flashcards.jsonl`) | hard-negative mining | `MedicalQARetrieval` |
 | `medembed` | [abhinand/MedEmbed-training-triplets-v1](https://huggingface.co/datasets/abhinand/MedEmbed-training-triplets-v1) — the clinical triplets the real MedEmbed models were trained on: **~232k rows complete** (a 10k starter sample is bundled at `data/raw/medembed_triplets.jsonl`) | **ships expert negatives** — mining is skipped | `MedicalQARetrieval` |
 
-All data is **real** and pulled from the Hugging Face Hub. The Colab/Kaggle notebooks pull
-the **complete** datasets automatically before training; locally:
+All data is **real** and pulled from the Hugging Face Hub — click a dataset name above and
+use its **Dataset Viewer** tab to browse the actual rows. The bundled copies in this repo are
+browsable at **[`data/raw/`](https://github.com/Om-merkle/AI_CAP_MED_EMBED/tree/main/data/raw)**
+([flashcards](https://github.com/Om-merkle/AI_CAP_MED_EMBED/blob/main/data/raw/medical_flashcards.jsonl) ·
+[MedEmbed triplets sample](https://github.com/Om-merkle/AI_CAP_MED_EMBED/blob/main/data/raw/medembed_triplets.jsonl)).
+The Colab/Kaggle notebooks pull the **complete** datasets automatically before training; locally:
 
 ```bash
 python scripts/download_dataset.py                       # COMPLETE datasets (default: all ~232k triplets)
