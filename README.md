@@ -164,7 +164,9 @@ Also in the Streamlit UI ("Medical benchmark leaderboard") and via the API
 ## Per-run leaderboard
 
 Every run appends its metrics to `results/leaderboard.csv` and prints a ranked table
-(best first). Tag a run with `--run-label`:
+(best first). Runs that used LLM triplet generation also log their **token usage and
+estimated cost** (`llm_model`, `llm_input_tokens`, `llm_output_tokens`, `llm_cost_usd`)
+so the price of each experiment sits next to its scores. Tag a run with `--run-label`:
 
 ```bash
 python run_pipeline.py --domain nfcorpus --run-label bge-nfcorpus-1ep

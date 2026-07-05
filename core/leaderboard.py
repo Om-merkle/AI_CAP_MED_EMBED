@@ -26,6 +26,7 @@ FIELDS = [
     "ir_ndcg@10_base", "ir_ndcg@10_ft", "ir_ndcg@10_delta",
     "mteb_ndcg@10_base", "mteb_ndcg@10_ft", "mteb_ndcg@10_delta",
     "triplet_accuracy",
+    "llm_model", "llm_input_tokens", "llm_output_tokens", "llm_cost_usd",
 ]
 
 
@@ -40,11 +41,21 @@ def _delta(before: Any, after: Any) -> float | None:
     return None
 
 
-def record(run_label: str = "", num_triplets: int | None = None) -> dict[str, Any]:
-    """Append the current run's metrics (from results/*.json) to the leaderboard CSV."""
+def record(
+    run_label: str = "",
+    num_triplets: int | None = None,
+    llm_usage: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Append the current run's metrics (from results/*.json) to the leaderboard CSV.
+
+    `llm_usage` is the usage blob from llm_triplet_gen (tokens + estimated cost of
+    gpt-5.4-nano calls); pass it only when this run actually generated LLM triplets,
+    so the cost columns stay attributed to the right run.
+    """
     base, ft, cmp = _read("baseline.json"), _read("finetuned.json"), _read("comparison.json")
     mteb_b = base.get("mteb", {}).get("ndcg@10")
     mteb_f = ft.get("mteb", {}).get("ndcg@10")
+    llm_usage = llm_usage or {}
 
     row: dict[str, Any] = {
         "run_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
@@ -63,6 +74,10 @@ def record(run_label: str = "", num_triplets: int | None = None) -> dict[str, An
         "mteb_ndcg@10_ft": mteb_f,
         "mteb_ndcg@10_delta": _delta(mteb_b, mteb_f),
         "triplet_accuracy": ft.get("triplet_accuracy"),
+        "llm_model": llm_usage.get("model"),
+        "llm_input_tokens": llm_usage.get("input_tokens"),
+        "llm_output_tokens": llm_usage.get("output_tokens"),
+        "llm_cost_usd": llm_usage.get("estimated_cost_usd"),
     }
 
     is_new = not LEADERBOARD_PATH.exists()
@@ -101,7 +116,7 @@ def show(top: int | None = None) -> str:
         rows = rows[:top]
 
     cols = ["run_at", "run_label", "base_model", "domain", "epochs", "batch_size",
-            "ir_ndcg@10_ft", "mteb_ndcg@10_ft", "mteb_ndcg@10_delta"]
+            "ir_ndcg@10_ft", "mteb_ndcg@10_ft", "mteb_ndcg@10_delta", "llm_cost_usd"]
     header = ["rank"] + cols
     lines = [header]
     for i, r in enumerate(rows, 1):

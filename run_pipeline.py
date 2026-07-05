@@ -104,7 +104,12 @@ def main() -> None:
     print(f"\n=== DONE: IR nDCG@10 delta = {delta}  ->  {verdict} ===")
 
     # Log this run and print the ranked leaderboard of all runs so far.
-    leaderboard.record(run_label=args.run_label, num_triplets=triplet_info.get("num_triplets"))
+    # LLM token usage/cost is attributed only when this run generated LLM triplets.
+    leaderboard.record(
+        run_label=args.run_label,
+        num_triplets=triplet_info.get("num_triplets"),
+        llm_usage=triplet_info.get("usage"),
+    )
     print("\n=== LEADERBOARD (best first) ===")
     print(leaderboard.show())
 
