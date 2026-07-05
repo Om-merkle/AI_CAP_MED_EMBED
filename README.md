@@ -1,7 +1,9 @@
 # 🩺 AI — Medical Embedding Fine-Tuning (MedEmbed-style)
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Om-merkle/AI_CAP_MED_EMBED/blob/main/notebooks/run_on_colab.ipynb)
-[![Open In Kaggle](https://img.shields.io/badge/Open%20in-Kaggle-20BEFF?logo=kaggle&logoColor=white)](https://kaggle.com/kernels/welcome?src=https://github.com/Om-merkle/AI_CAP_MED_EMBED/blob/main/notebooks/run_on_kaggle.ipynb)
+[![Open In Kaggle](https://img.shields.io/badge/Open%20in-Kaggle-20BEFF?logo=kaggle&logoColor=white)](https://www.kaggle.com/kernels/welcome?src=https%3A%2F%2Fgithub.com%2FOm-merkle%2FAI_CAP_MED_EMBED%2Fblob%2Fmain%2Fnotebooks%2Frun_on_kaggle.ipynb)
+
+**Notebooks:** [notebooks/run_on_colab.ipynb](https://github.com/Om-merkle/AI_CAP_MED_EMBED/blob/main/notebooks/run_on_colab.ipynb) · [notebooks/run_on_kaggle.ipynb](https://github.com/Om-merkle/AI_CAP_MED_EMBED/blob/main/notebooks/run_on_kaggle.ipynb)
 
 An end-to-end application that fine-tunes a text-embedding model on **medical data** and
 proves it got better on the medical domain. It reproduces the MedEmbed recipe with a simple,
@@ -78,9 +80,11 @@ python scripts/download_dataset.py --medembed-rows 10000 # smaller local sample 
 
 ## ▶️ Run on Kaggle (alternative — free T4 ×2, 30 GPU-hrs/week)
 
-1. Push this project to GitHub *(or upload it as a Kaggle Dataset).*
-2. Kaggle → **Create → Notebook**. In **Settings**: **Accelerator = GPU T4 ×2**, **Internet = On**.
-3. Open `notebooks/run_on_kaggle.ipynb`, set your repo URL, and run top-to-bottom — fully
+1. Notebook file: **[notebooks/run_on_kaggle.ipynb](https://github.com/Om-merkle/AI_CAP_MED_EMBED/blob/main/notebooks/run_on_kaggle.ipynb)**
+   — import it via Kaggle → **Create → Notebook** → **File → Import Notebook → GitHub** (paste that URL),
+   or click the "Open in Kaggle" badge above (requires being logged in to Kaggle).
+2. In **Settings**: **Accelerator = GPU T4 ×2**, **Internet = On**.
+3. Run top-to-bottom — fully
    wired: GPU check → clone + install → *(optional)* `HF_TOKEN` from Kaggle secrets →
    **pull the complete datasets from HF** → **Path A**:
    `!python run_pipeline.py --domain nfcorpus --epochs 3 --batch-size 32 --benchmark`
