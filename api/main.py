@@ -133,10 +133,13 @@ def run_med_leaderboard(bg: BackgroundTasks) -> JobRef:
 
 @app.get("/med-leaderboard")
 def get_med_leaderboard() -> dict[str, object]:
-    """Cached MedEmbed-style benchmark results (results/med_benchmarks.json)."""
+    """Cached MedEmbed-style benchmark results + the formatted table."""
     if not med_leaderboard.CACHE_PATH.exists():
         raise HTTPException(status_code=404, detail="no medical benchmark results yet")
-    return json.loads(med_leaderboard.CACHE_PATH.read_text(encoding="utf-8"))
+    cache = json.loads(med_leaderboard.CACHE_PATH.read_text(encoding="utf-8"))
+    df = med_leaderboard.to_dataframe()
+    cache["table"] = df.to_string(index=False) if not df.empty else ""
+    return cache
 
 
 @app.get("/llm-usage")
