@@ -38,8 +38,13 @@ def mine() -> dict[str, Any]:
 
     # The mining corpus is the set of unique positives. `range_max` (how deep we search)
     # must stay below that size or torch.topk overflows - so scale it to the corpus.
+    # The window also has to clear each query's OWN positives: BeIR corpora like
+    # NFCorpus average ~43 positives per query, so a 50-deep window leaves almost no
+    # negative candidates (97% of pairs got dropped). Scale it to positives-per-query.
     n_docs = len(set(pairs["positive"]))
-    range_max = min(50, max(2, n_docs - 5))
+    positives_per_query = len(pairs) / max(1, len(set(pairs["anchor"])))
+    depth = 50 + int(positives_per_query * 3)
+    range_max = min(depth, 300, max(2, n_docs - 5))
     range_min = min(10, max(0, range_max - 1))
     num_negatives = max(1, min(settings.num_negatives, range_max - range_min))
 
