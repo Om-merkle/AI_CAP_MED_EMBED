@@ -27,3 +27,6 @@ venv/
 
 # HF caches (if created locally)
 .cache/
+
+# Local-only walkthrough doc (kept out of the shipped repo)
+PIPELINE_WALKTHROUGH.md
