@@ -38,6 +38,11 @@ class Settings(BaseSettings):
 
     # ---- Model / domain ----
     base_model: str = "BAAI/bge-small-en-v1.5"
+    # Optional multi-model sweep: fine-tune EACH of these open-source base models in one
+    # run (comma-separated), every result landing on the leaderboard. Empty = just
+    # `base_model`. Only open-source, sentence-transformers-compatible models can be
+    # fine-tuned; closed-source models belong in `baseline_models`.
+    base_models: str = ""
     domain: str = "nfcorpus"                # nfcorpus | flashcards | medembed
     mteb_task: str = ""                     # primary task; empty = auto from the domain
     mteb_tasks: str = ""                    # comma-separated suite; empty = MTEB_BENCHMARK_TASKS
@@ -63,6 +68,14 @@ class Settings(BaseSettings):
         "BAAI/bge-small-en-v1.5,"
         "abhinand/MedEmbed-small-v0.1"
     )
+    # Closed-source, encode-only baselines to include in the triplet benchmark alongside
+    # the open-source candidates - the commercial embeddings your fine-tune is trying to
+    # beat. `openai:` names hit the OpenAI embeddings API and are skipped automatically
+    # when OPENAI_API_KEY is unset. These are NEVER fine-tuned.
+    baseline_models: str = (
+        "openai:text-embedding-3-small,"
+        "openai:text-embedding-3-large"
+    )
 
     # ---- Optional LLM triplet generation ----
     openai_api_key: str = ""
@@ -71,6 +84,9 @@ class Settings(BaseSettings):
     # user. Defaults match nano-class pricing; override in .env for other models.
     openai_input_price_per_1m: float = 0.05
     openai_output_price_per_1m: float = 0.40
+    # $ per 1M tokens for OpenAI embedding baselines (text-embedding-3-small default);
+    # used to estimate the cost of the closed-source benchmark comparison.
+    openai_embedding_price_per_1m: float = 0.02
 
     # ---- Optional Hub push ----
     hf_token: str = ""
@@ -89,6 +105,15 @@ class Settings(BaseSettings):
     def use_fp16(self) -> bool:
         # fp16 only helps on CUDA; bge models train fine with it.
         return self.device == "cuda"
+
+    @property
+    def effective_base_models(self) -> list[str]:
+        """The open-source base models to fine-tune this run (sweep list or single)."""
+        if self.base_models:
+            names = [m.strip() for m in self.base_models.split(",") if m.strip()]
+            if names:
+                return names
+        return [self.base_model]
 
     @property
     def effective_mteb_task(self) -> str:

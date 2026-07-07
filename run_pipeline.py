@@ -8,6 +8,13 @@ Examples
 # Full run on a Kaggle GPU (NFCorpus medical IR):
     python run_pipeline.py --domain nfcorpus --base-model BAAI/bge-small-en-v1.5 --epochs 1
 
+# Sweep several open-source base models in one run (each lands on the leaderboard):
+    python run_pipeline.py --domain nfcorpus --epochs 1 \
+        --base-models BAAI/bge-small-en-v1.5,intfloat/e5-small-v2,thenlper/gte-small
+
+# Compare against closed-source (OpenAI) embeddings on the triplets (needs OPENAI_API_KEY):
+    python run_pipeline.py --domain nfcorpus --sample-size 2000 --benchmark
+
 # Train on the bundled medical flashcards dataset:
     python run_pipeline.py --domain flashcards --sample-size 5000
 
@@ -31,6 +38,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--domain", default=settings.domain,
                    help="nfcorpus | flashcards | medembed")
     p.add_argument("--base-model", default=settings.base_model)
+    p.add_argument("--base-models", default="",
+                   help="comma-separated open-source base models to fine-tune in ONE run "
+                        "(a sweep); each lands on the leaderboard. Overrides --base-model.")
     p.add_argument("--epochs", type=int, default=settings.epochs)
     p.add_argument("--batch-size", type=int, default=settings.batch_size)
     p.add_argument("--sample-size", type=int, default=settings.sample_size,
@@ -53,6 +63,7 @@ def parse_args() -> argparse.Namespace:
 def apply_args(args: argparse.Namespace) -> None:
     settings.domain = args.domain
     settings.base_model = args.base_model
+    settings.base_models = args.base_models
     settings.epochs = args.epochs
     settings.batch_size = args.batch_size
     settings.sample_size = args.sample_size
@@ -62,25 +73,62 @@ def apply_args(args: argparse.Namespace) -> None:
     settings.mteb_tasks = args.mteb_tasks
 
 
+def _finetune_one(model_name: str, args: argparse.Namespace, triplet_info: dict) -> None:
+    """Baseline -> fine-tune -> evaluate -> compare -> record, for one base model.
+
+    The model-independent stages (data prep, triplet collection) have already run; this
+    is everything that depends on the chosen base model, so a sweep just calls it per model.
+    """
+    from core import baseline, compare, evaluate, leaderboard, train
+
+    settings.base_model = model_name  # each stage below reads settings.base_model
+
+    print(f"\n########## base_model = {model_name} ##########")
+
+    print("\n[baseline] MTEB / IR baseline (base model) ...")
+    print(json.dumps(baseline.run(), indent=2))
+
+    print("\n[train] Fine-tuning ...")
+    print(json.dumps(train.finetune(), indent=2))
+
+    print("\n[evaluate] Evaluating fine-tuned model ...")
+    print(json.dumps(evaluate.run(), indent=2))
+
+    print("\n[compare] Comparison (before vs after) ...")
+    result = compare.diff()
+    print(json.dumps(result, indent=2))
+
+    delta = result.get("headline_ir_ndcg@10_delta")
+    verdict = "IMPROVED" if result.get("improved") else "NO IMPROVEMENT"
+    print(f"\n=== {model_name}: IR nDCG@10 delta = {delta}  ->  {verdict} ===")
+
+    # Log this run. LLM token usage/cost is attributed only when this run generated
+    # LLM triplets (same triplets feed every model in a sweep, so it is recorded each time).
+    leaderboard.record(
+        run_label=args.run_label,
+        num_triplets=triplet_info.get("num_triplets"),
+        llm_usage=triplet_info.get("usage"),
+    )
+
+
 def main() -> None:
     args = parse_args()
     apply_args(args)
 
     # Imported after settings are applied so each stage sees the final config.
-    from core import (
-        baseline, benchmark, compare, data_prep, evaluate, leaderboard,
-        llm_triplet_gen, train, triplet_mining,
-    )
+    from core import benchmark, data_prep, leaderboard, llm_triplet_gen, triplet_mining
 
-    print(f"[device] {settings.device}  |  base_model={settings.base_model}  "
+    sweep = settings.effective_base_models
+    print(f"[device] {settings.device}  |  base_models={', '.join(sweep)}  "
           f"domain={settings.domain}  primary_task={settings.effective_mteb_task}")
     if settings.run_mteb:
         print(f"[benchmarks] {', '.join(settings.effective_mteb_tasks)}")
 
-    print("\n[1/6] Preparing medical data ...")
+    # ----- Model-independent stages: run ONCE, shared across the whole sweep -----
+    print("\n[data] Preparing medical data ...")
     print(json.dumps(data_prep.build_pairs(), indent=2))
 
-    print("\n[2/6] Collecting triplets ...")
+    print("\n[triplets] Collecting triplets ...")
     triplet_info = llm_triplet_gen.generate() if args.llm_triplets else triplet_mining.mine()
     print(json.dumps(triplet_info, indent=2))
     usage = triplet_info.get("usage")
@@ -89,33 +137,14 @@ def main() -> None:
               f"tokens ≈ ${usage['estimated_cost_usd']} ({usage['model']})")
 
     if args.benchmark:
-        print("\n[extra] Benchmarking candidate models on the domain triplets ...")
+        print("\n[extra] Benchmarking candidate models on the domain triplets "
+              "(open-source + closed-source baselines) ...")
         print(benchmark.show(benchmark.evaluate_models()))
 
-    print("\n[3/6] MTEB / IR baseline (base model) ...")
-    print(json.dumps(baseline.run(), indent=2))
+    # ----- Per-model stages: baseline -> train -> evaluate -> compare -> record -----
+    for model_name in sweep:
+        _finetune_one(model_name, args, triplet_info)
 
-    print("\n[4/6] Fine-tuning ...")
-    print(json.dumps(train.finetune(), indent=2))
-
-    print("\n[5/6] Evaluating fine-tuned model ...")
-    print(json.dumps(evaluate.run(), indent=2))
-
-    print("\n[6/6] Comparison (before vs after) ...")
-    result = compare.diff()
-    print(json.dumps(result, indent=2))
-
-    delta = result.get("headline_ir_ndcg@10_delta")
-    verdict = "IMPROVED" if result.get("improved") else "NO IMPROVEMENT"
-    print(f"\n=== DONE: IR nDCG@10 delta = {delta}  ->  {verdict} ===")
-
-    # Log this run and print the ranked leaderboard of all runs so far.
-    # LLM token usage/cost is attributed only when this run generated LLM triplets.
-    leaderboard.record(
-        run_label=args.run_label,
-        num_triplets=triplet_info.get("num_triplets"),
-        llm_usage=triplet_info.get("usage"),
-    )
     print("\n=== LEADERBOARD (best first) ===")
     print(leaderboard.show())
 

@@ -11,6 +11,8 @@ class ConfigUpdate(BaseModel):
     """Subset of settings the UI is allowed to change at runtime."""
 
     base_model: str | None = None
+    base_models: str | None = None      # comma-separated open-source sweep (empty = single)
+    baseline_models: str | None = None  # comma-separated closed-source (encode-only) baselines
     domain: str | None = None
     mteb_tasks: str | None = None
     sample_size: int | None = None

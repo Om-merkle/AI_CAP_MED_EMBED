@@ -61,6 +61,20 @@ with st.sidebar:
     cfg = api_get("/config")
     domains = cfg.get("domains", ["nfcorpus", "flashcards", "medembed"])
     base_model = st.text_input("Base model", cfg["base_model"])
+    base_models = st.text_input(
+        "Base models — sweep (comma-sep, blank = single)", cfg.get("base_models", ""),
+        help="Fine-tune several open-source models in one run; each lands on the leaderboard.",
+    )
+    baseline_models = st.text_input(
+        "Closed-source baselines (encode-only)", cfg.get("baseline_models", ""),
+        help="e.g. openai:text-embedding-3-small — compared in the benchmark, never trained. "
+             "Needs OPENAI_API_KEY; skipped without one.",
+    )
+    if cfg.get("openai_key_set"):
+        st.caption("🔑 OPENAI_API_KEY detected — closed-source baselines active.")
+    else:
+        st.caption("⚠️ No OPENAI_API_KEY (set it in the backend's `.env` and restart) — "
+                   "`openai:` baselines are skipped.")
     domain = st.selectbox("Medical domain", domains, index=domains.index(cfg["domain"]))
     st.caption(f"Official MTEB task: **{cfg['mteb_task']}**")
     sample_size = st.number_input("Training pairs (0 = all)", 0, 500000, int(cfg["sample_size"] or 0))
@@ -73,6 +87,8 @@ with st.sidebar:
     if st.button("Save config"):
         new_cfg = api_post("/config", {
             "base_model": base_model,
+            "base_models": base_models,
+            "baseline_models": baseline_models,
             "domain": domain,
             "sample_size": int(sample_size) or None,
             "eval_queries": int(eval_queries),
@@ -110,6 +126,8 @@ with c1:
 
 with c2:
     st.markdown("**2. Shortlist, baseline & train**")
+    st.caption("Open-source candidates + closed-source baselines (`api=True`, e.g. OpenAI). "
+               "API baselines are shown for comparison only — never fine-tuned.")
     if st.button("Benchmark candidate models"):
         result = run_job("/benchmark-models", "Model benchmark")
         if result:

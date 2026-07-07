@@ -126,6 +126,30 @@ Default candidates: `all-MiniLM-L6-v2` (general), `BAAI/bge-small-en-v1.5` (base
 `abhinand/MedEmbed-small-v0.1` (published medical model) — so you can see exactly where
 your own fine-tune should land.
 
+**Closed-source baselines.** When `OPENAI_API_KEY` is set, the benchmark also scores the
+commercial OpenAI embeddings your fine-tune is trying to beat — `BASELINE_MODELS` defaults
+to `openai:text-embedding-3-small,openai:text-embedding-3-large`. These are **encode-only
+baselines**: they appear in the benchmark (tagged `api`) with an estimated API cost, but are
+never fine-tuned (their weights are closed). Without a key they are skipped silently. The
+`openai:` prefix routes through `core/encoders.py`, so an OpenAI model can also be dropped
+into the medical MTEB leaderboard's `MODELS` list — though encoding a full retrieval corpus
+over the API costs real money, so it is opt-in there.
+
+## Fine-tune several base models at once (sweep)
+
+Pass a comma-separated list to fine-tune **each** open-source base model in one run. Data
+prep + triplet collection happen once, then baseline → train → evaluate → compare → record
+runs per model, so every model lands on the leaderboard as its own row:
+
+```bash
+python run_pipeline.py --domain nfcorpus --epochs 3 \
+    --base-models BAAI/bge-small-en-v1.5,intfloat/e5-small-v2,thenlper/gte-small \
+    --benchmark --run-label sweep-nfcorpus
+```
+
+Only open-source, `sentence-transformers`-compatible models can be fine-tuned; closed-source
+models belong in `BASELINE_MODELS` above. Omit `--base-models` for the usual single-model run.
+
 ## Optional: LLM clinical-triplet generation
 
 This is how the original MedEmbed built its data (LLaMA 70B over PMC clinical notes).

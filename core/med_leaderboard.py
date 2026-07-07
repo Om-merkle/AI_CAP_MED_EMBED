@@ -60,7 +60,10 @@ def _save_cache(cache: dict[str, Any]) -> None:
     CACHE_PATH.write_text(json.dumps(cache, indent=2), encoding="utf-8")
 
 
-def _count_params_millions(model) -> int:
+def _count_params_millions(model) -> int | None:
+    # Closed-source / API models have no local weights to count.
+    if not hasattr(model, "_first_module"):
+        return None
     n = sum(p.numel() for p in model._first_module().auto_model.parameters())
     return round(n / 1_000_000)
 
@@ -95,21 +98,29 @@ def _extract_metrics(results: Any) -> dict[str, float | None]:
 def evaluate(models: list[str] | None = None, tasks: list[str] | None = None) -> dict[str, Any]:
     """Evaluate each model on each task (skipping cached pairs). Returns the cache."""
     import mteb
-    from sentence_transformers import SentenceTransformer
+
+    from core.encoders import is_api_model, load_encoder
 
     models = models or [m.strip() for m in settings.benchmark_models.split(",") if m.strip()]
     tasks = tasks or DEFAULT_TASKS
     cache = _load_cache()
 
     for name in models:
+        # API models have no param count, so `params_m is None` is not a "needs (re)load"
+        # signal for them - track completeness by whether every task is cached instead.
         entry = cache["models"].setdefault(name, {"params_m": None, "tasks": {}})
         missing = [t for t in tasks if t not in entry["tasks"]]
-        if not missing and entry["params_m"] is not None:
+        params_done = entry["params_m"] is not None or is_api_model(name)
+        if not missing and params_done:
             print(f"[cached] {name}")
             continue
 
         print(f"[evaluating] {name} on {missing or '(params only)'}")
-        model = SentenceTransformer(name, device=settings.device)
+        try:
+            model = load_encoder(name)
+        except Exception as exc:  # e.g. closed-source model without an API key
+            print(f"[skipped] {name}: {exc}")
+            continue
         if entry["params_m"] is None:
             entry["params_m"] = _count_params_millions(model)
 
@@ -138,9 +149,12 @@ def to_dataframe(tasks: list[str] | None = None):
     cache = _load_cache()
     tasks = tasks or DEFAULT_TASKS
 
+    from core.encoders import is_api_model
+
     rows = []
     for name, entry in cache["models"].items():
-        row: dict[Any, Any] = {("", "Model"): name, ("", "# Params"): f"{entry.get('params_m') or '?'}M"}
+        params = "API" if is_api_model(name) else f"{entry.get('params_m') or '?'}M"
+        row: dict[Any, Any] = {("", "Model"): name, ("", "# Params"): params}
         for t in tasks:
             m = entry.get("tasks", {}).get(t, {})
             row[(t, "nDCG@10")] = m.get("ndcg@10")
