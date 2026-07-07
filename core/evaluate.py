@@ -24,7 +24,10 @@ from pathlib import Path
 from typing import Any
 
 from sentence_transformers import SentenceTransformer
-from sentence_transformers.evaluation import InformationRetrievalEvaluator, TripletEvaluator
+from sentence_transformers.sentence_transformer.evaluation import (
+    InformationRetrievalEvaluator,
+    TripletEvaluator,
+)
 
 from core.config import settings
 from core.data_prep import load_eval
