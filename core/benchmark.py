@@ -64,15 +64,17 @@ def evaluate_models(model_names: list[str] | None = None, limit: int | None = 50
     results: list[dict[str, Any]] = []
     for name in model_names:
         api = is_api_model(name)
+        # Guard the WHOLE model (load + encode + score): a failing candidate - a missing
+        # key, an OpenAI 403/rate-limit, an unreachable Hub model - must record an error
+        # row and let the remaining models finish, never crash the benchmark.
         try:
             model = load_encoder(name)
-        except Exception as exc:  # missing key / unreachable model: skip, don't crash
+            q = model.encode(queries, convert_to_tensor=True, show_progress_bar=False)
+            p = model.encode(positives, convert_to_tensor=True, show_progress_bar=False)
+            n = model.encode(negatives, convert_to_tensor=True, show_progress_bar=False)
+        except Exception as exc:
             results.append({"model": name, "api": api, "error": str(exc)})
             continue
-
-        q = model.encode(queries, convert_to_tensor=True, show_progress_bar=False)
-        p = model.encode(positives, convert_to_tensor=True, show_progress_bar=False)
-        n = model.encode(negatives, convert_to_tensor=True, show_progress_bar=False)
 
         pos_sim = util.cos_sim(q, p).diagonal()
         neg_sim = util.cos_sim(q, n).diagonal()
