@@ -17,8 +17,8 @@ import json
 from typing import Any
 
 from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer
-from sentence_transformers.losses import MultipleNegativesRankingLoss
-from sentence_transformers.training_args import (
+from sentence_transformers.sentence_transformer.losses import MultipleNegativesRankingLoss
+from sentence_transformers.sentence_transformer.training_args import (
     BatchSamplers,
     SentenceTransformerTrainingArguments,
 )
@@ -55,7 +55,9 @@ def finetune() -> dict[str, Any]:
         num_train_epochs=settings.epochs,
         per_device_train_batch_size=settings.batch_size,
         learning_rate=settings.learning_rate,
-        warmup_ratio=settings.warmup_ratio,
+        # Transformers v5 deprecated `warmup_ratio`; `warmup_steps` given a float < 1.0 is
+        # now interpreted as the warmup ratio (settings.warmup_ratio stays a fraction, e.g. 0.1).
+        warmup_steps=settings.warmup_ratio,
         fp16=settings.use_fp16,
         batch_sampler=BatchSamplers.NO_DUPLICATES,  # avoid duplicate in-batch negatives
         logging_steps=50,

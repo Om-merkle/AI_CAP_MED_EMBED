@@ -8,7 +8,13 @@ Walk top-to-bottom: configure -> prepare data -> collect triplets -> benchmark m
 from __future__ import annotations
 
 import os
+import sys
 import time
+
+# `streamlit run app/streamlit_app.py` puts THIS file's folder (app/) on sys.path, not the
+# project root - so `from core import ...` below would fail with ModuleNotFoundError. Add the
+# project root (the parent of app/) so core is importable no matter the launch directory.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pandas as pd
 import requests
