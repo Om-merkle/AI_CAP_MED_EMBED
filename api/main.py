@@ -38,6 +38,8 @@ def health() -> dict[str, str]:
 def get_config() -> dict[str, object]:
     return {
         "base_model": settings.base_model,
+        "base_models": settings.base_models,
+        "baseline_models": settings.baseline_models,
         "domain": settings.domain,
         "domains": sorted(data_prep.DOMAINS),
         "mteb_task": settings.effective_mteb_task,
@@ -49,6 +51,9 @@ def get_config() -> dict[str, object]:
         "batch_size": settings.batch_size,
         "run_mteb": settings.run_mteb,
         "device": settings.device,
+        # Whether an OpenAI key was found in .env (never the key itself) - lets the UI show
+        # if closed-source baselines / LLM triplets are active.
+        "openai_key_set": bool(settings.openai_api_key),
     }
 
 

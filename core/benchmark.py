@@ -19,9 +19,28 @@ import json
 from typing import Any
 
 import numpy as np
-from sentence_transformers import SentenceTransformer, util
+from sentence_transformers import util
 
 from core.config import settings
+from core.encoders import is_api_model, load_encoder
+
+
+def _candidate_models() -> list[str]:
+    """Open-source candidates + closed-source baselines, deduped in order.
+
+    Closed-source (`openai:`) baselines are dropped when OPENAI_API_KEY is unset, so the
+    benchmark still runs on the open-source models alone.
+    """
+    names = [m.strip() for m in settings.benchmark_models.split(",") if m.strip()]
+    names += [m.strip() for m in settings.baseline_models.split(",") if m.strip()]
+    out: list[str] = []
+    for name in names:
+        if name in out:
+            continue
+        if is_api_model(name) and not settings.openai_api_key:
+            continue  # closed-source baseline needs an API key; skip quietly
+        out.append(name)
+    return out
 
 
 def _load_triplets(limit: int | None = 500) -> list[dict[str, str]]:
@@ -35,7 +54,7 @@ def _load_triplets(limit: int | None = 500) -> list[dict[str, str]]:
 
 def evaluate_models(model_names: list[str] | None = None, limit: int | None = 500) -> dict[str, Any]:
     """Benchmark candidate models on the domain triplets. Writes results/benchmark.json."""
-    model_names = model_names or [m.strip() for m in settings.benchmark_models.split(",") if m.strip()]
+    model_names = model_names or _candidate_models()
     rows = _load_triplets(limit)
 
     queries = [r["anchor"] for r in rows]
@@ -44,7 +63,13 @@ def evaluate_models(model_names: list[str] | None = None, limit: int | None = 50
 
     results: list[dict[str, Any]] = []
     for name in model_names:
-        model = SentenceTransformer(name, device=settings.device)
+        api = is_api_model(name)
+        try:
+            model = load_encoder(name)
+        except Exception as exc:  # missing key / unreachable model: skip, don't crash
+            results.append({"model": name, "api": api, "error": str(exc)})
+            continue
+
         q = model.encode(queries, convert_to_tensor=True, show_progress_bar=False)
         p = model.encode(positives, convert_to_tensor=True, show_progress_bar=False)
         n = model.encode(negatives, convert_to_tensor=True, show_progress_bar=False)
@@ -53,17 +78,26 @@ def evaluate_models(model_names: list[str] | None = None, limit: int | None = 50
         neg_sim = util.cos_sim(q, n).diagonal()
         margins = (pos_sim - neg_sim).cpu().numpy()
 
-        results.append(
-            {
-                "model": name,
-                "triplet_accuracy": round(float((pos_sim > neg_sim).float().mean().item()), 4),
-                "avg_margin": round(float(np.mean(margins)), 4),
-                "min_margin": round(float(np.min(margins)), 4),
-                "max_margin": round(float(np.max(margins)), 4),
-            }
-        )
+        row: dict[str, Any] = {
+            "model": name,
+            "api": api,  # closed-source baseline (True) vs trainable open-source (False)
+            "triplet_accuracy": round(float((pos_sim > neg_sim).float().mean().item()), 4),
+            "avg_margin": round(float(np.mean(margins)), 4),
+            "min_margin": round(float(np.min(margins)), 4),
+            "max_margin": round(float(np.max(margins)), 4),
+        }
+        # Attribute API token cost for closed-source baselines (encoded 3x len(rows) texts).
+        if api and getattr(model, "input_tokens", 0):
+            row["input_tokens"] = model.input_tokens
+            row["estimated_cost_usd"] = round(
+                model.input_tokens * settings.openai_embedding_price_per_1m / 1_000_000, 6
+            )
+        results.append(row)
 
-    results.sort(key=lambda r: (r["triplet_accuracy"], r["avg_margin"]), reverse=True)
+    results.sort(
+        key=lambda r: (r.get("triplet_accuracy") or -1.0, r.get("avg_margin") or -1.0),
+        reverse=True,
+    )
     blob = {"domain": settings.domain, "num_triplets": len(rows), "models": results}
 
     out = settings.results_dir / "benchmark.json"
@@ -79,10 +113,13 @@ def show(blob: dict[str, Any] | None = None) -> str:
             return "(no benchmark yet - run core.benchmark.evaluate_models first)"
         blob = json.loads(path.read_text(encoding="utf-8"))
 
-    header = ["rank", "model", "triplet_accuracy", "avg_margin"]
+    header = ["rank", "model", "kind", "triplet_accuracy", "avg_margin"]
     lines = [header]
     for i, r in enumerate(blob["models"], 1):
-        lines.append([str(i), r["model"], str(r["triplet_accuracy"]), str(r["avg_margin"])])
+        kind = "api" if r.get("api") else "local"
+        acc = "ERR" if "error" in r else str(r.get("triplet_accuracy"))
+        margin = "-" if "error" in r else str(r.get("avg_margin"))
+        lines.append([str(i), r["model"], kind, acc, margin])
     widths = [max(len(line[c]) for line in lines) for c in range(len(header))]
     return "\n".join("  ".join(cell.ljust(widths[c]) for c, cell in enumerate(line)) for line in lines)
 
